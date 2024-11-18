@@ -3,3 +3,6 @@ clangd:
 
 install: clangd
 	cmake --build build --parallel $(nproc) --target install
+
+bench:
+	sudo python3 harness.py
