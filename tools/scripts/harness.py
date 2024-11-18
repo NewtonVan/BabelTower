@@ -48,7 +48,7 @@ def run_babel_tower(block: Optional[str] = None, virtgb: Optional[int] = None, p
 if __name__ == "__main__":
     # Example usage
     run_babel_tower(
-        block='/dev/sda',
+        block='/dev/nvme0n1',
         threads=4,
         datasize=2
     )

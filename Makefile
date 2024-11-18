@@ -5,4 +5,7 @@ install: clangd
 	cmake --build build --parallel $(nproc) --target install
 
 bench:
-	sudo python3 harness.py
+	sudo python3 tools/scripts/harness.py
+
+analysis:
+	python3 tools/scripts/analysis.py
