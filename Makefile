@@ -1,5 +1,5 @@
-vmcache: vmcache.cpp tpcc/*pp
-	g++ -DNDEBUG -O3 -std=c++20 -g -fnon-call-exceptions -fasynchronous-unwind-tables vmcache.cpp -o vmcache -laio
+clangd:
+	cmake -B build -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DCMAKE_BUILD_TYPE=Debug
 
-clean:
-	rm vmcache
+install: clangd
+	cmake --build build --parallel $(nproc) --target install
