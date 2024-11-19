@@ -23,8 +23,8 @@ def calculate_statistics(df: pd.DataFrame) -> None:
     """计算并打印tx列的统计数据"""
     df['tx'] = pd.to_numeric(df['tx'])
     mean_tx = df['tx'].mean()
-    p95_tx = df['tx'].quantile(0.95)
-    p99_tx = df['tx'].quantile(0.99)
+    p95_tx = df['tx'].quantile(1-0.95)
+    p99_tx = df['tx'].quantile(1-0.99)
     print(f"Mean of tx: {mean_tx}")
     print(f"95th percentile of tx: {p95_tx}")
     print(f"99th percentile of tx: {p99_tx}")
