@@ -3,8 +3,9 @@
 // handle exception for exmap
 [[maybe_unused]] void handleSEGFAULT(int signo, siginfo_t *info, void *extra) {
   void *page = info->si_addr;
-  if (bm.isValidPtr(page)) {
-    cerr << "segfault restart " << bm.toPID(page) << endl;
+  if (ExecContext::getGlobalContext().bm_.isValidPtr(page)) {
+    cerr << "segfault restart "
+         << ExecContext::getGlobalContext().bm_.toPID(page) << endl;
     throw OLCRestartException();
   } else {
     cerr << "segfault " << page << endl;
@@ -46,12 +47,17 @@ int main(int argc, char **argv) {
     u64 cnt = 0;
     for (uint64_t i = 0; i < runForSec; i++) {
       sleep(1);
-      float rmb = (bm.readCount.exchange(0) * pageSize) / (1024.0 * 1024);
-      float wmb = (bm.writeCount.exchange(0) * pageSize) / (1024.0 * 1024);
+      float rmb = (ExecContext::getGlobalContext().bm_.readCount.exchange(0) *
+                   pageSize) /
+                  (1024.0 * 1024);
+      float wmb = (ExecContext::getGlobalContext().bm_.writeCount.exchange(0) *
+                   pageSize) /
+                  (1024.0 * 1024);
       u64 prog = txProgress.exchange(0);
       cout << cnt++ << "," << prog << "," << rmb << "," << wmb << ","
            << systemName << "," << nthreads << "," << n << ","
-           << (isRndread ? "rndread" : "tpcc") << "," << bm.batch << endl;
+           << (isRndread ? "rndread" : "tpcc") << ","
+           << ExecContext::getGlobalContext().bm_.batch << endl;
     }
     keepRunning = false;
   };
@@ -77,11 +83,13 @@ int main(int argc, char **argv) {
                      }
                    });
     }
-    cerr << "space: " << (bm.allocCount.load() * pageSize) / (float)bm.gb
+    cerr << "space: "
+         << (ExecContext::getGlobalContext().bm_.allocCount.load() * pageSize) /
+                (float)ExecContext::getGlobalContext().bm_.gb
          << " GB " << endl;
 
-    bm.readCount = 0;
-    bm.writeCount = 0;
+    ExecContext::getGlobalContext().bm_.readCount = 0;
+    ExecContext::getGlobalContext().bm_.writeCount = 0;
     thread statThread(statFn);
 
     parallel_for(0, nthreads, nthreads,
@@ -155,11 +163,13 @@ int main(int argc, char **argv) {
                    }
                  });
   }
-  cerr << "space: " << (bm.allocCount.load() * pageSize) / (float)bm.gb
+  cerr << "space: "
+       << (ExecContext::getGlobalContext().bm_.allocCount.load() * pageSize) /
+              (float)ExecContext::getGlobalContext().bm_.gb
        << " GB " << endl;
 
-  bm.readCount = 0;
-  bm.writeCount = 0;
+  ExecContext::getGlobalContext().bm_.readCount = 0;
+  ExecContext::getGlobalContext().bm_.writeCount = 0;
   thread statThread(statFn);
 
   parallel_for(0, nthreads, nthreads,
@@ -182,7 +192,9 @@ int main(int argc, char **argv) {
                });
 
   statThread.join();
-  cerr << "space: " << (bm.allocCount.load() * pageSize) / (float)bm.gb
+  cerr << "space: "
+       << (ExecContext::getGlobalContext().bm_.allocCount.load() * pageSize) /
+              (float)ExecContext::getGlobalContext().bm_.gb
        << " GB " << endl;
 
   return 0;

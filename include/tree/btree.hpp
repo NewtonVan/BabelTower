@@ -1,3 +1,4 @@
+#pragma once
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -47,14 +48,14 @@ static const int16_t maxWorkerThreads = 128;
     exit(EXIT_FAILURE);                                                        \
   } while (0)
 
-uint64_t rdtsc() {
+inline uint64_t rdtsc() {
   uint32_t hi, lo;
   __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
   return static_cast<uint64_t>(lo) | (static_cast<uint64_t>(hi) << 32);
 }
 
 // allocate memory using huge pages
-void *allocHuge(size_t size) {
+inline void *allocHuge(size_t size) {
   void *p = mmap(NULL, size, PROT_READ | PROT_WRITE,
                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   madvise(p, size, MADV_HUGEPAGE);
@@ -62,7 +63,7 @@ void *allocHuge(size_t size) {
 }
 
 // use when lock is not free
-void yield(u64 counter) { _mm_pause(); }
+inline void yield(u64 counter) { _mm_pause(); }
 
 struct PageState {
   atomic<u64> stateAndVersion;
@@ -325,7 +326,18 @@ struct BufferManager {
   void evict();
 };
 
-BufferManager bm;
+struct ExecContext {
+  // TODO(chen): use a uniq ptr?
+  BufferManager bm_;
+  static ExecContext &getGlobalContext();
+
+private:
+  static ExecContext global_ctx;
+};
+
+ExecContext ExecContext::global_ctx;
+
+ExecContext &ExecContext::getGlobalContext() { return global_ctx; }
 
 struct OLCRestartException {};
 
@@ -337,14 +349,15 @@ template <class T> struct GuardO {
 
   // constructor
   explicit GuardO(u64 pid)
-      : pid(pid), ptr(reinterpret_cast<T *>(bm.toPtr(pid))) {
+      : pid(pid), ptr(reinterpret_cast<T *>(
+                      ExecContext::getGlobalContext().bm_.toPtr(pid))) {
     init();
   }
 
   template <class T2> GuardO(u64 pid, GuardO<T2> &parent) {
     parent.checkVersionAndRestart();
     this->pid = pid;
-    ptr = reinterpret_cast<T *>(bm.toPtr(pid));
+    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.toPtr(pid));
     init();
   }
 
@@ -356,7 +369,7 @@ template <class T> struct GuardO {
 
   void init() {
     assert(pid != moved);
-    PageState &ps = bm.getPageState(pid);
+    PageState &ps = ExecContext::getGlobalContext().bm_.getPageState(pid);
     for (u64 repeatCounter = 0;; repeatCounter++) {
       u64 v = ps.stateAndVersion.load();
       switch (PageState::getState(v)) {
@@ -372,8 +385,8 @@ template <class T> struct GuardO {
         break;
       case PageState::Evicted:
         if (ps.tryLockX(v)) {
-          bm.handleFault(pid);
-          bm.unfixX(pid);
+          ExecContext::getGlobalContext().bm_.handleFault(pid);
+          ExecContext::getGlobalContext().bm_.unfixX(pid);
         }
         break;
       default:
@@ -404,7 +417,7 @@ template <class T> struct GuardO {
 
   void checkVersionAndRestart() {
     if (pid != moved) {
-      PageState &ps = bm.getPageState(pid);
+      PageState &ps = ExecContext::getGlobalContext().bm_.getPageState(pid);
       u64 stateAndVersion = ps.stateAndVersion.load();
       if (version == stateAndVersion) // fast path, nothing changed
         return;
@@ -448,14 +461,15 @@ template <class T> struct GuardX {
 
   // constructor
   explicit GuardX(u64 pid) : pid(pid) {
-    ptr = reinterpret_cast<T *>(bm.fixX(pid));
+    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.fixX(pid));
     ptr->dirty = true;
   }
 
   explicit GuardX(GuardO<T> &&other) {
     assert(other.pid != moved);
     for (u64 repeatCounter = 0;; repeatCounter++) {
-      PageState &ps = bm.getPageState(other.pid);
+      PageState &ps =
+          ExecContext::getGlobalContext().bm_.getPageState(other.pid);
       u64 stateAndVersion = ps.stateAndVersion;
       if ((stateAndVersion << 8) != (other.version << 8))
         throw OLCRestartException();
@@ -480,7 +494,7 @@ template <class T> struct GuardX {
   // move assignment operator
   GuardX &operator=(GuardX &&other) {
     if (pid != moved) {
-      bm.unfixX(pid);
+      ExecContext::getGlobalContext().bm_.unfixX(pid);
     }
     pid = other.pid;
     ptr = other.ptr;
@@ -495,7 +509,7 @@ template <class T> struct GuardX {
   // destructor
   ~GuardX() {
     if (pid != moved)
-      bm.unfixX(pid);
+      ExecContext::getGlobalContext().bm_.unfixX(pid);
   }
 
   T *operator->() {
@@ -505,7 +519,7 @@ template <class T> struct GuardX {
 
   void release() {
     if (pid != moved) {
-      bm.unfixX(pid);
+      ExecContext::getGlobalContext().bm_.unfixX(pid);
       pid = moved;
     }
   }
@@ -513,9 +527,10 @@ template <class T> struct GuardX {
 
 template <class T> struct AllocGuard : public GuardX<T> {
   template <typename... Params> AllocGuard(Params &&...params) {
-    GuardX<T>::ptr = reinterpret_cast<T *>(bm.allocPage());
+    GuardX<T>::ptr =
+        reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.allocPage());
     new (GuardX<T>::ptr) T(std::forward<Params>(params)...);
-    GuardX<T>::pid = bm.toPID(GuardX<T>::ptr);
+    GuardX<T>::pid = ExecContext::getGlobalContext().bm_.toPID(GuardX<T>::ptr);
   }
 };
 
@@ -526,12 +541,13 @@ template <class T> struct GuardS {
 
   // constructor
   explicit GuardS(u64 pid) : pid(pid) {
-    ptr = reinterpret_cast<T *>(bm.fixS(pid));
+    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.fixS(pid));
   }
 
   GuardS(GuardO<T> &&other) {
     assert(other.pid != moved);
-    if (bm.getPageState(other.pid).tryLockS(other.version)) { // XXX: optimize?
+    if (ExecContext::getGlobalContext().bm_.getPageState(other.pid).tryLockS(
+            other.version)) { // XXX: optimize?
       pid = other.pid;
       ptr = other.ptr;
       other.pid = moved;
@@ -543,7 +559,7 @@ template <class T> struct GuardS {
 
   GuardS(GuardS &&other) {
     if (pid != moved)
-      bm.unfixS(pid);
+      ExecContext::getGlobalContext().bm_.unfixS(pid);
     pid = other.pid;
     ptr = other.ptr;
     other.pid = moved;
@@ -556,7 +572,7 @@ template <class T> struct GuardS {
   // move assignment operator
   GuardS &operator=(GuardS &&other) {
     if (pid != moved)
-      bm.unfixS(pid);
+      ExecContext::getGlobalContext().bm_.unfixS(pid);
     pid = other.pid;
     ptr = other.ptr;
     other.pid = moved;
@@ -570,7 +586,7 @@ template <class T> struct GuardS {
   // destructor
   ~GuardS() {
     if (pid != moved)
-      bm.unfixS(pid);
+      ExecContext::getGlobalContext().bm_.unfixS(pid);
   }
 
   T *operator->() {
@@ -580,7 +596,7 @@ template <class T> struct GuardS {
 
   void release() {
     if (pid != moved) {
-      bm.unfixS(pid);
+      ExecContext::getGlobalContext().bm_.unfixS(pid);
       pid = moved;
     }
   }
@@ -1072,7 +1088,7 @@ struct BTreeNode : public BTreeNodeHeader {
       return false;
     copyKeyValueRange(&tmp, 0, 0, count);
     right->copyKeyValueRange(&tmp, count, 0, right->count);
-    PID pid = bm.toPID(this);
+    PID pid = ExecContext::getGlobalContext().bm_.toPID(this);
     memcpy(parent->getPayload(slotId + 1).data(), &pid, sizeof(PID));
     parent->removeSlot(slotId);
     tmp.makeHint();
@@ -1164,7 +1180,7 @@ struct BTreeNode : public BTreeNodeHeader {
     nodeLeft->setFences(getLowerFence(), sep);
     nodeRight->setFences(sep, getUpperFence());
 
-    PID leftPID = bm.toPID(this);
+    PID leftPID = ExecContext::getGlobalContext().bm_.toPID(this);
     u16 oldParentSlot = parent->lowerBound(sep);
     if (oldParentSlot == parent->count) {
       assert(parent->upperInnerNode == leftPID);
