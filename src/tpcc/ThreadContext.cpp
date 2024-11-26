@@ -1,4 +1,4 @@
-#include <tpcc/ThreadContext.hpp>
+#include <common/ThreadContext.hpp>
 
 __thread uint16_t workerThreadId = 0;
 __thread int32_t tpcchistorycounter = 0;

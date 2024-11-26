@@ -1,3 +1,6 @@
+#include <thread>
+
+#include <common/utils.hpp>
 #include <tpcc/bench.hpp>
 
 // handle exception for exmap

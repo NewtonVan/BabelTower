@@ -1,3 +1,4 @@
+#include <tpcc/TPCCWorkload.hpp>
 #include <tree/btree.hpp>
 
 typedef u64 KeyType;

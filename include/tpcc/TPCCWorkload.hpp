@@ -2,7 +2,7 @@
 #include "Schema.hpp"
 // -------------------------------------------------------------------------------------
 #include "RandomGenerator.hpp"
-#include <tpcc/ThreadContext.hpp>
+#include <common/ThreadContext.hpp>
 // -------------------------------------------------------------------------------------
 #include <algorithm>
 #include <vector>
@@ -368,7 +368,7 @@ template <template <typename> class AdapterType> struct TPCCWorkload {
     Integer o_id = district.lookupField({w_id, d_id}, &district_t::d_next_o_id);
 
     //"SELECT COUNT(DISTINCT (S_I_ID)) AS STOCK_COUNT FROM orderline, stock
-    //WHERE OL_W_ID = ? AND OL_D_ID = ? AND OL_O_ID < ? AND OL_O_ID >= ? AND
+    // WHERE OL_W_ID = ? AND OL_D_ID = ? AND OL_O_ID < ? AND OL_O_ID >= ? AND
     // S_W_ID = ? AND S_I_ID = OL_I_ID AND S_QUANTITY < ?"
 
     /*
