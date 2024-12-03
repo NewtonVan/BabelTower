@@ -4,8 +4,7 @@
 
 #include <libaio.h>
 
-#include <common/pages.hpp>
-#include <tpcc/Types.hpp>
+#include <buffer/pages.hpp>
 
 using std::vector;
 

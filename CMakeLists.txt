@@ -11,18 +11,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -fnon-call-exceptions -fasynchronous-unwind-tables")
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fnon-call-exceptions -fasynchronous-unwind-tables")
 
-file(GLOB_RECURSE SRC src/*.cpp include/*.h)
-
-add_executable(babel_tower ${SRC})
-
-target_include_directories(babel_tower PUBLIC include)
-
-target_link_libraries(babel_tower aio pthread)
+add_subdirectory(bench)
+add_subdirectory(src)
 
 # clean 
 add_custom_target(clean_bb
-    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/vmcache     # Removes vmcache in the build directory
-    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_SOURCE_DIR}/vmcache     # Removes vmcache in the current directory
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/babel_tower     # Removes vmcache in the build directory
+    COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_SOURCE_DIR}/babel_tower     # Removes vmcache in the current directory
 )
 
 # Set the install prefix to the current directory

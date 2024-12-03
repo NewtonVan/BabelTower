@@ -1,10 +1,6 @@
 #include <common/ThreadContext.hpp>
 #include <tree/btree.hpp>
 
-ExecContext ExecContext::global_ctx;
-
-ExecContext &ExecContext::getGlobalContext() { return global_ctx; }
-
 BTree::BTree() : splitOrdered(false) {
   GuardX<MetaDataPage> page(metadataPageId);
   AllocGuard<BTreeNode> rootNode(true);

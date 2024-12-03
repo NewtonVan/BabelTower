@@ -4,7 +4,7 @@ cfg_debug:
 install_debug: cfg_debug
 	cmake --build build --parallel $(nproc) --target install
 
-bench:
+tpcc:
 	sudo python3 tools/scripts/harness.py
 
 analysis:

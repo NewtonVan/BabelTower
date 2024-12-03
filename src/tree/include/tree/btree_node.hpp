@@ -1,4 +1,5 @@
-#include <common/page_guard.hpp>
+#include <buffer/page_guard.hpp>
+#include <buffer/vm_buffer.hpp>
 #include <span>
 
 using std::span;
@@ -282,7 +283,7 @@ struct BTreeNode : public BTreeNodeHeader {
       return false;
     copyKeyValueRange(&tmp, 0, 0, count);
     right->copyKeyValueRange(&tmp, count, 0, right->count);
-    PID pid = ExecContext::getGlobalContext().bm_.toPID(this);
+    PID pid = ExecContext::getGlobalContext().bm_->toPID(this);
     memcpy(parent->getPayload(slotId + 1).data(), &pid, sizeof(PID));
     parent->removeSlot(slotId);
     tmp.makeHint();
@@ -374,7 +375,7 @@ struct BTreeNode : public BTreeNodeHeader {
     nodeLeft->setFences(getLowerFence(), sep);
     nodeRight->setFences(sep, getUpperFence());
 
-    PID leftPID = ExecContext::getGlobalContext().bm_.toPID(this);
+    PID leftPID = ExecContext::getGlobalContext().bm_->toPID(this);
     u16 oldParentSlot = parent->lowerBound(sep);
     if (oldParentSlot == parent->count) {
       assert(parent->upperInnerNode == leftPID);

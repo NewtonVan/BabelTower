@@ -1,4 +1,5 @@
 #pragma once
+#include <buffer/vm_buffer.hpp>
 #include <common/exec_context.hpp>
 
 struct OLCRestartException {};
@@ -12,14 +13,15 @@ template <class T> struct GuardO {
   // constructor
   explicit GuardO(u64 pid)
       : pid(pid), ptr(reinterpret_cast<T *>(
-                      ExecContext::getGlobalContext().bm_.toPtr(pid))) {
+                      ExecContext::getGlobalContext().bm_->toPtr(pid))) {
     init();
   }
 
   template <class T2> GuardO(u64 pid, GuardO<T2> &parent) {
     parent.checkVersionAndRestart();
     this->pid = pid;
-    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.toPtr(pid));
+    ptr =
+        reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_->toPtr(pid));
     init();
   }
 
@@ -31,7 +33,7 @@ template <class T> struct GuardO {
 
   void init() {
     assert(pid != moved);
-    PageState &ps = ExecContext::getGlobalContext().bm_.getPageState(pid);
+    PageState &ps = ExecContext::getGlobalContext().bm_->getPageState(pid);
     for (u64 repeatCounter = 0;; repeatCounter++) {
       u64 v = ps.stateAndVersion.load();
       switch (PageState::getState(v)) {
@@ -47,8 +49,8 @@ template <class T> struct GuardO {
         break;
       case PageState::Evicted:
         if (ps.tryLockX(v)) {
-          ExecContext::getGlobalContext().bm_.handleFault(pid);
-          ExecContext::getGlobalContext().bm_.unfixX(pid);
+          ExecContext::getGlobalContext().bm_->handleFault(pid);
+          ExecContext::getGlobalContext().bm_->unfixX(pid);
         }
         break;
       default:
@@ -79,7 +81,7 @@ template <class T> struct GuardO {
 
   void checkVersionAndRestart() {
     if (pid != moved) {
-      PageState &ps = ExecContext::getGlobalContext().bm_.getPageState(pid);
+      PageState &ps = ExecContext::getGlobalContext().bm_->getPageState(pid);
       u64 stateAndVersion = ps.stateAndVersion.load();
       if (version == stateAndVersion) // fast path, nothing changed
         return;
@@ -123,7 +125,7 @@ template <class T> struct GuardX {
 
   // constructor
   explicit GuardX(u64 pid) : pid(pid) {
-    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.fixX(pid));
+    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_->fixX(pid));
     ptr->dirty = true;
   }
 
@@ -131,7 +133,7 @@ template <class T> struct GuardX {
     assert(other.pid != moved);
     for (u64 repeatCounter = 0;; repeatCounter++) {
       PageState &ps =
-          ExecContext::getGlobalContext().bm_.getPageState(other.pid);
+          ExecContext::getGlobalContext().bm_->getPageState(other.pid);
       u64 stateAndVersion = ps.stateAndVersion;
       if ((stateAndVersion << 8) != (other.version << 8))
         throw OLCRestartException();
@@ -156,7 +158,7 @@ template <class T> struct GuardX {
   // move assignment operator
   GuardX &operator=(GuardX &&other) {
     if (pid != moved) {
-      ExecContext::getGlobalContext().bm_.unfixX(pid);
+      ExecContext::getGlobalContext().bm_->unfixX(pid);
     }
     pid = other.pid;
     ptr = other.ptr;
@@ -171,7 +173,7 @@ template <class T> struct GuardX {
   // destructor
   ~GuardX() {
     if (pid != moved)
-      ExecContext::getGlobalContext().bm_.unfixX(pid);
+      ExecContext::getGlobalContext().bm_->unfixX(pid);
   }
 
   T *operator->() {
@@ -181,7 +183,7 @@ template <class T> struct GuardX {
 
   void release() {
     if (pid != moved) {
-      ExecContext::getGlobalContext().bm_.unfixX(pid);
+      ExecContext::getGlobalContext().bm_->unfixX(pid);
       pid = moved;
     }
   }
@@ -190,9 +192,9 @@ template <class T> struct GuardX {
 template <class T> struct AllocGuard : public GuardX<T> {
   template <typename... Params> AllocGuard(Params &&...params) {
     GuardX<T>::ptr =
-        reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.allocPage());
+        reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_->allocPage());
     new (GuardX<T>::ptr) T(std::forward<Params>(params)...);
-    GuardX<T>::pid = ExecContext::getGlobalContext().bm_.toPID(GuardX<T>::ptr);
+    GuardX<T>::pid = ExecContext::getGlobalContext().bm_->toPID(GuardX<T>::ptr);
   }
 };
 
@@ -203,12 +205,12 @@ template <class T> struct GuardS {
 
   // constructor
   explicit GuardS(u64 pid) : pid(pid) {
-    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_.fixS(pid));
+    ptr = reinterpret_cast<T *>(ExecContext::getGlobalContext().bm_->fixS(pid));
   }
 
   GuardS(GuardO<T> &&other) {
     assert(other.pid != moved);
-    if (ExecContext::getGlobalContext().bm_.getPageState(other.pid).tryLockS(
+    if (ExecContext::getGlobalContext().bm_->getPageState(other.pid).tryLockS(
             other.version)) { // XXX: optimize?
       pid = other.pid;
       ptr = other.ptr;
@@ -221,7 +223,7 @@ template <class T> struct GuardS {
 
   GuardS(GuardS &&other) {
     if (pid != moved)
-      ExecContext::getGlobalContext().bm_.unfixS(pid);
+      ExecContext::getGlobalContext().bm_->unfixS(pid);
     pid = other.pid;
     ptr = other.ptr;
     other.pid = moved;
@@ -234,7 +236,7 @@ template <class T> struct GuardS {
   // move assignment operator
   GuardS &operator=(GuardS &&other) {
     if (pid != moved)
-      ExecContext::getGlobalContext().bm_.unfixS(pid);
+      ExecContext::getGlobalContext().bm_->unfixS(pid);
     pid = other.pid;
     ptr = other.ptr;
     other.pid = moved;
@@ -248,7 +250,7 @@ template <class T> struct GuardS {
   // destructor
   ~GuardS() {
     if (pid != moved)
-      ExecContext::getGlobalContext().bm_.unfixS(pid);
+      ExecContext::getGlobalContext().bm_->unfixS(pid);
   }
 
   T *operator->() {
@@ -258,7 +260,7 @@ template <class T> struct GuardS {
 
   void release() {
     if (pid != moved) {
-      ExecContext::getGlobalContext().bm_.unfixS(pid);
+      ExecContext::getGlobalContext().bm_->unfixS(pid);
       pid = moved;
     }
   }

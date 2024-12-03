@@ -12,7 +12,7 @@ using std::endl;
 
 constexpr int16_t maxWorkerThreads = 128;
 
-BufferManager::BufferManager()
+VMBufferManager::VMBufferManager()
     : virtSize(envOr("VIRTGB", 16) * gb), physSize(envOr("PHYSGB", 4) * gb),
       virtCount(virtSize / pageSize), physCount(physSize / pageSize),
       residentSet(physCount) {
@@ -51,13 +51,13 @@ BufferManager::BufferManager()
        << " physgb:" << physSize / gb << " exmap:" << false << endl;
 }
 
-void BufferManager::ensureFreePages() {
+void VMBufferManager::ensureFreePages() {
   if (physUsedCount >= physCount * 0.95)
     evict();
 }
 
 // allocated new page and fix it
-Page *BufferManager::allocPage() {
+Page *VMBufferManager::allocPage() {
   physUsedCount++;
   ensureFreePages();
   u64 pid = allocCount++;
@@ -75,14 +75,14 @@ Page *BufferManager::allocPage() {
   return virtMem + pid;
 }
 
-void BufferManager::handleFault(PID pid) {
+void VMBufferManager::handleFault(PID pid) {
   physUsedCount++;
   ensureFreePages();
   readPage(pid);
   residentSet.insert(pid);
 }
 
-Page *BufferManager::fixX(PID pid) {
+Page *VMBufferManager::fixX(PID pid) {
   PageState &ps = getPageState(pid);
   for (u64 repeatCounter = 0;; repeatCounter++) {
     u64 stateAndVersion = ps.stateAndVersion.load();
@@ -105,7 +105,7 @@ Page *BufferManager::fixX(PID pid) {
   }
 }
 
-Page *BufferManager::fixS(PID pid) {
+Page *VMBufferManager::fixS(PID pid) {
   PageState &ps = getPageState(pid);
   for (u64 repeatCounter = 0;; repeatCounter++) {
     u64 stateAndVersion = ps.stateAndVersion;
@@ -129,17 +129,17 @@ Page *BufferManager::fixS(PID pid) {
   }
 }
 
-void BufferManager::unfixS(PID pid) { getPageState(pid).unlockS(); }
+void VMBufferManager::unfixS(PID pid) { getPageState(pid).unlockS(); }
 
-void BufferManager::unfixX(PID pid) { getPageState(pid).unlockX(); }
+void VMBufferManager::unfixX(PID pid) { getPageState(pid).unlockX(); }
 
-void BufferManager::readPage(PID pid) {
+void VMBufferManager::readPage(PID pid) {
   int ret = pread(blockfd, virtMem + pid, pageSize, pid * pageSize);
   assert(ret == pageSize);
   readCount++;
 }
 
-void BufferManager::evict() {
+void VMBufferManager::evict() {
   vector<PID> toEvict;
   toEvict.reserve(batch);
   vector<PID> toWrite;

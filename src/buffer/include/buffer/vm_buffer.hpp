@@ -1,8 +1,8 @@
 #pragma once
-#include <common/lib_aio.hpp>
+#include <buffer/lib_aio.hpp>
 #include <common/type.hpp>
 
-struct BufferManager {
+struct VMBufferManager {
   static const u64 mb = 1024ull * 1024;
   static const u64 gb = 1024ull * 1024 * 1024;
   u64 virtSize;
@@ -26,8 +26,8 @@ struct BufferManager {
 
   PageState &getPageState(PID pid) { return pageState[pid]; }
 
-  BufferManager();
-  ~BufferManager() {}
+  VMBufferManager();
+  ~VMBufferManager() {}
 
   Page *fixX(PID pid);
   void unfixX(PID pid);

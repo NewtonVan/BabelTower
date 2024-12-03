@@ -90,7 +90,7 @@ public:
           return false;
 
         {
-          GuardX<BTreeNode> nodeLocked(move(node));
+          GuardX<BTreeNode> nodeLocked(std::move(node));
           fn(nodeLocked->getPayload(pos));
           return true;
         }
@@ -110,7 +110,7 @@ public:
         while (node->isInner())
           node = GuardO<BTreeNode>(node->lookupInner(key), node);
 
-        return GuardS<BTreeNode>(move(node));
+        return GuardS<BTreeNode>(std::move(node));
       } catch (const OLCRestartException &) {
         yield(repeatCounter);
       }
