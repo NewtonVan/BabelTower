@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
       cout << cnt++ << "," << prog << "," << rmb << "," << wmb << ","
            << systemName << "," << nthreads << "," << n << ","
            << (isRndread ? "rndread" : "tpcc") << ","
-           << ExecContext::getGlobalContext().bm_->batch << endl;
+           << ExecContext::getGlobalContext().bm_->getBatch() << endl;
     }
     keepRunning = false;
   };
