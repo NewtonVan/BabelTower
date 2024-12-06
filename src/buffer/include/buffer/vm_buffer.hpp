@@ -1,12 +1,10 @@
 #pragma once
+#include <buffer/buffer_manager.hpp>
 #include <buffer/lib_aio.hpp>
 #include <common/type.hpp>
 
-class VMBufferManager {
+class VMBufferManager : public IBufferManager {
 public:
-  static const u64 mb = 1024ull * 1024;
-  static const u64 gb = 1024ull * 1024 * 1024;
-
   // FIXME: wrap these in a struct
   // used for static analysis
   atomic<u64> allocCount;
@@ -16,20 +14,22 @@ public:
   VMBufferManager();
   ~VMBufferManager() {}
 
-  Page *fixX(PID pid);
-  void unfixX(PID pid);
-  Page *fixS(PID pid);
-  void unfixS(PID pid);
+  Page *fixX(PID pid) override;
+  void unfixX(PID pid) override;
+  Page *fixS(PID pid) override;
+  void unfixS(PID pid) override;
 
-  Page *toPtr(PID pid) { return virtMem + pid; }
-  PID toPID(void *page) { return reinterpret_cast<Page *>(page) - virtMem; }
-  PageState &getPageState(PID pid) { return pageState[pid]; }
-  Page *allocPage();
-  void handleFault(PID pid);
-
-  u64 getBatch() const { return batch; }
+  Page *toPtr(PID pid) override { return virtMem + pid; }
+  PID toPID(void *page) override {
+    return reinterpret_cast<Page *>(page) - virtMem;
+  }
+  PageState &getPageState(PID pid) override { return pageState[pid]; }
+  Page *allocPage() override;
+  void handleFault(PID pid) override;
 
   // only for vmcache
+  u64 getBatch() const { return batch; }
+
   bool isValidPtr(void *page) {
     return (page >= virtMem) && (page < (virtMem + virtSize + 16));
   }

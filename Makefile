@@ -19,3 +19,6 @@ install_release: cfg_release
 clean:
 	rm -rf build
 	rm babel_tower
+
+viz:
+	cmake --build build --parallel $(nproc) --target graphviz

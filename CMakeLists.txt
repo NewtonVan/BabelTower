@@ -11,6 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -fnon-call-exceptions -fasynchronous-unwind-tables")
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fnon-call-exceptions -fasynchronous-unwind-tables")
 
+#add_subdirectory(third_party)
 add_subdirectory(bench)
 add_subdirectory(src)
 
@@ -18,6 +19,13 @@ add_subdirectory(src)
 add_custom_target(clean_bb
     COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/babel_tower     # Removes vmcache in the build directory
     COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_SOURCE_DIR}/babel_tower     # Removes vmcache in the current directory
+)
+
+# visualization
+add_custom_target(graphviz ALL
+    COMMAND ${CMAKE_COMMAND} "--graphviz=foo.dot" .
+    COMMAND dot -Tpng foo.dot -o foo.png
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
 # Set the install prefix to the current directory
