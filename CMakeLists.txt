@@ -11,7 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -fnon-call-exceptions -fasynchronous-unwind-tables")
 set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fnon-call-exceptions -fasynchronous-unwind-tables")
 
-#add_subdirectory(third_party)
+add_subdirectory(third_party)
 add_subdirectory(bench)
 add_subdirectory(src)
 
